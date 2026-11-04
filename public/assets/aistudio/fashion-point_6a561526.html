@@ -221,8 +221,138 @@ body { padding-bottom: 76px !important; }
   .wrap{padding-bottom:80px}
 }
 </style>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script type="module">
+  import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { 
+    getFirestore, 
+    collection, 
+    doc, 
+    getDoc, 
+    getDocs, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    onSnapshot, 
+    query, 
+    where, 
+    serverTimestamp 
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    projectId: "vigilant-medium-cct7q",
+    appId: "1:399290492442:web:3e0c2bd5255a6b176c13a3",
+    apiKey: "AIzaSyAhOoVvZNq0ALiYSRR-OmTOjMDr1dZq3Mg",
+    authDomain: "vigilant-medium-cct7q.firebaseapp.com",
+    firestoreDatabaseId: "ai-studio-fashionpoint-c79c3666-e185-4cd3-b96a-3545b7c91b7d",
+    storageBucket: "vigilant-medium-cct7q.firebasestorage.app",
+    messagingSenderId: "399290492442"
+  };
+
+  const dbId = "ai-studio-fashionpoint-c79c3666-e185-4cd3-b96a-3545b7c91b7d";
+
+  function createCompatWrapper(dbInstance) {
+    function wrapDocSnap(snap) {
+      return {
+        id: snap.id,
+        exists: typeof snap.exists === 'function' ? snap.exists() : snap.exists,
+        data: () => snap.data() || {},
+        _raw: snap
+      };
+    }
+
+    function wrapQuerySnap(snap) {
+      const docs = snap.docs.map(wrapDocSnap);
+      return {
+        empty: snap.empty,
+        size: snap.size,
+        docs: docs,
+        forEach: (cb) => docs.forEach(cb),
+        _raw: snap
+      };
+    }
+
+    function createDocRef(colPath, docId) {
+      const dRef = docId ? doc(dbInstance, colPath, docId) : doc(collection(dbInstance, colPath));
+      return {
+        id: dRef.id,
+        path: dRef.path,
+        set: async (data, options) => {
+          return await setDoc(dRef, data, options || {});
+        },
+        update: async (data) => {
+          return await updateDoc(dRef, data);
+        },
+        get: async () => {
+          const snap = await getDoc(dRef);
+          return wrapDocSnap(snap);
+        },
+        onSnapshot: (onNext, onError) => {
+          return onSnapshot(dRef, (snap) => onNext(wrapDocSnap(snap)), onError);
+        }
+      };
+    }
+
+    function createQueryWrapper(qRef) {
+      return {
+        where: (field, op, value) => {
+          return createQueryWrapper(query(qRef, where(field, op, value)));
+        },
+        get: async () => {
+          const snap = await getDocs(qRef);
+          return wrapQuerySnap(snap);
+        },
+        onSnapshot: (onNext, onError) => {
+          return onSnapshot(qRef, (snap) => onNext(wrapQuerySnap(snap)), onError);
+        }
+      };
+    }
+
+    function createColRef(colPath) {
+      const cRef = collection(dbInstance, colPath);
+      const qWrap = createQueryWrapper(cRef);
+      return {
+        id: colPath,
+        doc: (docId) => createDocRef(colPath, docId),
+        add: async (data) => {
+          const d = createDocRef(colPath);
+          await d.set(data);
+          return d;
+        },
+        where: qWrap.where,
+        get: qWrap.get,
+        onSnapshot: qWrap.onSnapshot
+      };
+    }
+
+    return {
+      _raw: dbInstance,
+      collection: (colPath) => createColRef(colPath)
+    };
+  }
+
+  try {
+    const apps = getApps();
+    const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
+    const rawDb = getFirestore(app, dbId);
+    const compatDb = createCompatWrapper(rawDb);
+    window.db = compatDb;
+    window.firebase = {
+      apps: [app],
+      app: () => ({ firestore: () => compatDb }),
+      firestore: Object.assign(() => compatDb, {
+        FieldValue: {
+          serverTimestamp: () => serverTimestamp()
+        }
+      })
+    };
+    console.log("Storefront connected to named Firestore database:", dbId);
+    if (typeof window.initFirestoreLiveListeners === 'function') {
+      window.initFirestoreLiveListeners();
+    }
+  } catch (err) {
+    console.error("Firebase Modular Init Error in storefront:", err);
+  }
+</script>
 </head>
 <body>
 <div class="wrap" id="root"></div>
@@ -360,7 +490,7 @@ const T = {
   trust4Sub: { en: 'Website or phone directly', bn: 'ওয়েবসাইট বা ফোনে সরাসরি' },
 
   proprietor: { en: 'Proprietor', bn: 'প্রোপ্রাইটর' },
-  propName: { en: 'Chhayed Master', bn: 'ছায়েদ মাস্টার' },
+  propName: { en: 'Ibrahim Ahmed', bn: 'ইব্রাহিম আহমেদ' },
   propTitle: { en: 'Owner, Fashion Point', bn: 'সত্বাধিকারী, ফ্যাশন পয়েন্ট' },
   rights: { en: 'Fashion Point. All rights reserved.', bn: 'ফ্যাশন পয়েন্ট (Fashion Point)। সর্বস্বত্ব সংরক্ষিত।' },
 
@@ -816,6 +946,7 @@ function toggleWish(id, e) {
 }
 
 function productCard(p) {
+  if (!p) return '';
   const imgSrc = getProdImg(p);
   const isWished = wish.includes(p.id);
   const name = getProdName(p);
@@ -952,7 +1083,7 @@ function viewHome() {
 
   <h2 class="sec">${getT('popularSec')}</h2>
   <div class="prods">
-    ${featProducts.map(productCard).join('')}
+    ${featProducts.filter(p => p).map(productCard).join('')}
   </div>
   `;
 }
