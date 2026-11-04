@@ -191,12 +191,14 @@ select,.in{border:1px solid #d3d8e8;border-radius:8px;padding:9px 12px;backgroun
 .pay-cf:hover { background: #1d73ef; }
 
 .drawer,.ov{display:none}
-.bottom{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;width:100%;max-width:100vw;background:#fff;border-top:1px solid var(--line);align-items:center;justify-items:center;padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px));z-index:50;box-shadow:0 -4px 16px rgba(0,0,0,0.08)}
-.bottom a{display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:var(--mut);position:relative;width:100%;text-align:center;transition:color .15s;padding:3px 0}
-.bottom a:hover,.bottom a.on{color:var(--pink)}
-.bottom .bd{position:absolute;top:-4px;right:calc(50% - 18px);background:var(--pink);color:#fff;font-size:11px;font-weight:700;min-width:17px;height:17px;border-radius:10px;display:grid;place-items:center;padding:0 3px}
-#toast{position:fixed;left:50%;bottom:90px;transform:translate(-50%,20px);background:var(--navy);color:#fff;padding:11px 22px;border-radius:30px;opacity:0;pointer-events:none;transition:.25s;z-index:60;font-size:14.5px;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
-#toast.show{opacity:1;transform:translate(-50%,0)}
+body { padding-bottom: 74px !important; }
+.wrap { padding-bottom: 74px !important; }
+.bottom { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100% !important; max-width: 100vw !important; background: #ffffff !important; border-top: 1.5px solid #d9e4f4 !important; align-items: center !important; justify-items: center !important; padding: 8px 0 calc(8px + env(safe-area-inset-bottom,0px)) !important; z-index: 99999 !important; box-shadow: 0 -4px 18px rgba(0,0,0,0.12) !important; }
+.bottom a { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; font-size: 13px !important; font-weight: 700 !important; color: var(--mut) !important; position: relative !important; width: 100% !important; text-align: center !important; transition: color .15s !important; padding: 4px 0 !important; text-decoration: none !important; }
+.bottom a:hover, .bottom a.on { color: var(--pink) !important; }
+.bottom .bd { position: absolute !important; top: -4px !important; right: calc(50% - 18px) !important; background: var(--pink) !important; color: #fff !important; font-size: 11px !important; font-weight: 700 !important; min-width: 18px !important; height: 18px !important; border-radius: 10px !important; display: grid !important; place-items: center !important; padding: 0 4px !important; }
+#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%,20px); background: var(--navy); color: #fff; padding: 11px 22px; border-radius: 30px; opacity: 0; pointer-events: none; transition: .25s; z-index: 100000; font-size: 14.5px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+#toast.show { opacity: 1; transform: translate(-50%,0); }
 
 @media(max-width:860px){
   body{background:#fff}
@@ -215,7 +217,7 @@ select,.in{border:1px solid #d3d8e8;border-radius:8px;padding:9px 12px;backgroun
   footer{grid-template-columns:1fr;padding-bottom:20px}
   .pg{padding:14px 12px}
   .det,.two{grid-template-columns:1fr}.f2{grid-template-columns:1fr}
-  .wrap{padding-bottom:70px}
+  .wrap{padding-bottom:80px}
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1600,18 +1602,28 @@ function viewAccount() {
 function saveUserProfile(e) {
   e.preventDefault();
   const name = document.getElementById('u-name').value.trim();
-  const phone = document.getElementById('u-phone').value.trim();
+  const phoneRaw = document.getElementById('u-phone').value.trim();
   const dist = document.getElementById('u-dist').value;
   const thana = document.getElementById('u-thana').value.trim();
   const addr = document.getElementById('u-addr').value.trim();
+  const cleanPhone = phoneRaw.replace(/\D/g, '');
 
-  if (name && phone && addr) {
-    if (phone.length < 11) {
-      alert(currentLang==='en'?'Please enter a valid 11-digit mobile number.':'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন');
+  if (name && cleanPhone && addr) {
+    if (cleanPhone.length < 11) {
+      alert(currentLang==='en'?'Please enter a valid 11-digit mobile number.':'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)');
       return;
     }
-    localStorage.setItem('fp_user', JSON.stringify({ name, phone, dist, thana, addr }));
-    toast(currentLang==='en'?'Profile saved successfully!':'প্রোফাইল তথ্য সফলভাবে সেভ করা হয়েছে!');
+    const userPayload = { name, phone: cleanPhone, dist, thana, addr, registered_at: new Date().toISOString() };
+    localStorage.setItem('fp_user', JSON.stringify(userPayload));
+
+    // Firebase Firestore User Account Sync
+    if (typeof db !== 'undefined' && db && db.collection) {
+      db.collection('users').doc(cleanPhone).set(userPayload, { merge: true })
+        .then(() => console.log('User profile registered in Firebase Firestore'))
+        .catch(err => console.error('Firebase User Sync error:', err));
+    }
+
+    toast(currentLang==='en'?'Account profile registered & saved successfully!':'আপনার অ্যাকাউন্ট তথ্য সফলভাবে রেজিস্টার ও সেভ করা হয়েছে!');
     renderApp();
   }
 }
