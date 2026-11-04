@@ -52,6 +52,63 @@
         "role": { "type": "string" }
       },
       "required": ["uid", "email"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Product category entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "nameBn": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["id", "nameEn"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Homepage slider banner entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "badge": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "link": { "type": "string" },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["imageUrl"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Store configuration and delivery charges",
+      "type": "object",
+      "properties": {
+        "deliveryInsideDhaka": { "type": "number" },
+        "deliveryOutsideDhaka": { "type": "number" },
+        "deliveryExpress": { "type": "number" },
+        "freeDeliveryMin": { "type": "number" },
+        "contactPhone": { "type": "string" },
+        "whatsappPhone": { "type": "string" },
+        "storeAddress": { "type": "string" }
+      }
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer profile entity",
+      "type": "object",
+      "properties": {
+        "phone": { "type": "string" },
+        "name": { "type": "string" },
+        "dist": { "type": "string" },
+        "thana": { "type": "string" },
+        "addr": { "type": "string" },
+        "ordersCount": { "type": "number" }
+      },
+      "required": ["phone", "name"]
     }
   },
   "firestore": {
@@ -62,6 +119,22 @@
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Customer orders collection"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Product categories collection"
+    },
+    "/banners/{bannerId}": {
+      "schema": "Banner",
+      "description": "Homepage promotional banners"
+    },
+    "/settings/{settingId}": {
+      "schema": "Setting",
+      "description": "Store settings collection"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer profiles collection"
     },
     "/admins/{adminId}": {
       "schema": "Admin",

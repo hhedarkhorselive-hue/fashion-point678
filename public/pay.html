@@ -187,11 +187,16 @@ let db = null;
 try {
   if (typeof firebase !== 'undefined') {
     if (!firebase.apps.length) {
-      const app = firebase.initializeApp(firebaseConfig);
-      db = firebase.firestore(app, firebaseConfig.firestoreDatabaseId);
-    } else {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const dbId = firebaseConfig.firestoreDatabaseId || "ai-studio-fashionpoint-c79c3666-e185-4cd3-b96a-3545b7c91b7d";
+    try {
+      db = firebase.app().firestore(dbId);
+    } catch (e) {
       db = firebase.firestore();
     }
+    window.db = db;
+    console.log("Connected to named database in pay.html:", dbId);
   }
 } catch (err) {
   console.warn('Firebase init in pay.html:', err);

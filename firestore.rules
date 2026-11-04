@@ -13,21 +13,61 @@ service cloud.firestore {
 
     // Connection test document
     match /test/{document=**} {
-      allow read: if true;
+      allow read, write: if true;
     }
 
-    // Products collection: Public read and write for catalog, seeding, and updates
+    // Products collection: Public read and write for catalog, seeding, and admin updates
     match /products/{productId} {
       allow read, write: if true;
     }
 
-    // Orders collection: Public create for guest checkouts, public read and update for orders and admin tracking
+    // Orders collection: Public create for checkouts, public read and update for customer & admin tracking
     match /orders/{orderId} {
       allow read, write: if true;
     }
 
-    // Admins collection: Public read and write for admin role management
+    // Categories collection: Public read and admin management
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+
+    // Banners collection: Public read and admin management
+    match /banners/{bannerId} {
+      allow read, write: if true;
+    }
+
+    // Store settings (delivery charges, contact numbers)
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Customer profiles
+    match /customers/{customerId} {
+      allow read, write: if true;
+    }
+
+    // User accounts
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Admins collection: Role management (owner stvip67@gmail.com)
     match /admins/{adminId} {
+      allow read, write: if true;
+    }
+
+    // Admin invitations
+    match /adminInvitations/{invitationId} {
+      allow read, write: if true;
+    }
+
+    // Activity logs
+    match /activityLogs/{logId} {
+      allow read, write: if true;
+    }
+
+    // Devices & push tokens
+    match /devices/{deviceId} {
       allow read, write: if true;
     }
   }

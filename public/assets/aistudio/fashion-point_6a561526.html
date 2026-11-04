@@ -256,27 +256,39 @@ let db = null;
 try {
   if (typeof firebase !== 'undefined') {
     if (!firebase.apps.length) {
-      const app = firebase.initializeApp(firebaseConfig);
-      db = firebase.firestore(app, firebaseConfig.firestoreDatabaseId);
-    } else {
-      db = firebase.firestore();
+      firebase.initializeApp(firebaseConfig);
     }
+    const dbId = firebaseConfig.firestoreDatabaseId;
+    db = firebase.app().firestore(dbId);
     window.db = db;
+    console.log("Storefront connected to named Firestore database:", dbId);
   }
 } catch (e) {
-  console.warn("Firebase iframe init:", e);
+  console.warn("Storefront Firebase init warning:", e);
 }
 
 async function syncOrderToFirebase(o) {
   try {
-    const firestoreDb = window.db || (typeof firebase !== 'undefined' && firebase.apps.length ? firebase.firestore() : null);
+    // 1. Post to backend Express API (verifies items, totals, logs activity, upserts customer)
+    fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(o)
+    }).then(res => res.json()).then(data => {
+      console.log('Order submitted to server API:', data);
+    }).catch(err => {
+      console.warn('Server API order submit notice:', err);
+    });
+
+    // 2. Direct client Firestore write to named database
+    const firestoreDb = window.db || (typeof firebase !== 'undefined' && firebase.apps.length ? firebase.app().firestore(firebaseConfig.firestoreDatabaseId) : null);
     if (firestoreDb) {
       await firestoreDb.collection('orders').doc(o.id).set(o);
-      console.log("Order saved to Firestore successfully:", o.id);
+      console.log("Order saved to named Firestore collection successfully:", o.id);
       return true;
     }
   } catch (err) {
-    console.warn("Firestore compat write warning:", err);
+    console.warn("Firestore client write error:", err);
   }
 }
 
@@ -537,28 +549,42 @@ const raw = [
   ['than', "Long Cloth Than Fabric", 'লং ক্লথ থান', 130, 'p24'],
 ];
 
-const P = raw.map((r, i) => ({
-  id: i + 1,
+const DEFAULT_P = raw.map((r, i) => ({
+  id: String(i + 1),
   c: r[0],
   n_en: r[1],
   n_bn: r[2],
   pr: r[3],
   img: r[4],
+  imageUrl: '',
   sizes: SZ[r[0]] || null,
   u_en: r[0] === 'gaj' ? 'Yard' : r[0] === 'than' ? 'Roll' : '',
   u_bn: r[0] === 'gaj' ? 'গজ' : r[0] === 'than' ? 'থান' : '',
 }));
 
+let P = [...DEFAULT_P];
+
+function getProdImg(p) {
+  if (!p) return IMG.cat0 || IMG.p1;
+  const img = p.imageUrl || p.image || p.img || '';
+  if (typeof img === 'string' && (img.startsWith('http') || img.startsWith('/') || img.startsWith('data:'))) {
+    return img;
+  }
+  return IMG[img] || IMG.cat0 || IMG.p1;
+}
+
 function getProd(id) {
-  return P.find(p => p.id == id) || P[0];
+  return P.find(p => String(p.id) === String(id)) || P[0] || DEFAULT_P[0];
 }
 
 function getProdName(p) {
-  return currentLang === 'en' ? p.n_en : p.n_bn;
+  if (!p) return '';
+  return currentLang === 'en' ? (p.n_en || p.name || p.title) : (p.n_bn || p.name || p.title);
 }
 
 function getProdUnit(p) {
-  return currentLang === 'en' ? p.u_en : p.u_bn;
+  if (!p) return '';
+  return currentLang === 'en' ? (p.u_en || '') : (p.u_bn || '');
 }
 
 function getCategoryName(catKey) {
@@ -569,6 +595,82 @@ function getCategoryName(catKey) {
     return catKey;
   }
   return currentLang === 'en' ? catKey.n_en : catKey.n_bn;
+}
+
+// Live Firestore synchronization with Admin App
+let hasInitializedLiveListeners = false;
+function initFirestoreLiveListeners() {
+  if (hasInitializedLiveListeners) return;
+  const firestoreDb = window.db || (typeof firebase !== 'undefined' && firebase.apps.length ? firebase.app().firestore(firebaseConfig.firestoreDatabaseId) : null);
+  if (!firestoreDb) return;
+  hasInitializedLiveListeners = true;
+
+  // 1. Live Products listener from Admin App
+  firestoreDb.collection('products').onSnapshot(snapshot => {
+    if (snapshot && !snapshot.empty) {
+      const activeProducts = [];
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        if (d.status === 'archived' || d.isActive === false) return;
+        activeProducts.push({
+          id: doc.id,
+          c: d.category || d.categoryId || d.c || 'shirt',
+          n_en: d.name_en || d.title_en || d.name || d.title || 'Product',
+          n_bn: d.name_bn || d.title_bn || d.title || d.name || 'পণ্য',
+          pr: Number(d.price !== undefined ? d.price : (d.pr || 0)),
+          img: d.imageUrl || d.image || d.img || 'p1',
+          imageUrl: d.imageUrl || d.image || '',
+          sizes: d.sizes || SZ[d.category || 'shirt'] || null,
+          u_en: d.unit_en || (d.category === 'gaj' ? 'Yard' : d.category === 'than' ? 'Roll' : ''),
+          u_bn: d.unit_bn || (d.category === 'gaj' ? 'গজ' : d.category === 'than' ? 'থান' : ''),
+        });
+      });
+      if (activeProducts.length > 0) {
+        P = activeProducts;
+        console.log(`Live sync: loaded ${P.length} products from Admin Firestore.`);
+        renderApp();
+      }
+    }
+  }, err => console.warn('Live products snapshot error:', err));
+
+  // 2. Live Banners listener
+  firestoreDb.collection('banners').onSnapshot(snapshot => {
+    if (snapshot && !snapshot.empty) {
+      const liveBanners = [];
+      snapshot.forEach(doc => {
+        const b = doc.data();
+        if (b.isActive !== false) {
+          liveBanners.push({
+            badge_en: b.badge_en || 'Special Collection',
+            badge_bn: b.badge_bn || 'বিশেষ অফার',
+            title_en: b.title_en || b.title || 'Fashion Point',
+            title_bn: b.title_bn || b.title || 'ফ্যাশন পয়েন্ট',
+            sub_en: b.sub_en || b.subtitle || 'Exclusive collection online',
+            sub_bn: b.sub_bn || b.subtitle || 'সেরা পোশাকে আকর্ষণীয় কালেকশন',
+            img: b.imageUrl || b.img || IMG.hero1
+          });
+        }
+      });
+      if (liveBanners.length > 0) {
+        window.LIVE_BANNERS = liveBanners;
+        renderApp();
+      }
+    }
+  }, err => console.warn('Live banners snapshot error:', err));
+
+  // 3. Live Settings listener (Store info, contacts, delivery rates)
+  firestoreDb.collection('settings').doc('store').onSnapshot(doc => {
+    if (doc && doc.exists) {
+      const s = doc.data();
+      if (s.phone) TEL = s.phone;
+      if (s.whatsapp) WA = s.whatsapp;
+      renderApp();
+    }
+  }, err => console.warn('Live settings snapshot error:', err));
+}
+
+if (typeof window !== 'undefined') {
+  setTimeout(initFirestoreLiveListeners, 250);
 }
 
 const WA = '8801615607928';
@@ -714,7 +816,7 @@ function toggleWish(id, e) {
 }
 
 function productCard(p) {
-  const imgSrc = IMG[p.img] || IMG.cat0;
+  const imgSrc = getProdImg(p);
   const isWished = wish.includes(p.id);
   const name = getProdName(p);
   const unit = getProdUnit(p);
@@ -881,7 +983,7 @@ function viewProd(id) {
   const p = getProd(id);
   const name = getProdName(p);
   const unit = getProdUnit(p);
-  const imgSrc = IMG[p.img] || IMG.cat0;
+  const imgSrc = getProdImg(p);
   const sizesObj = p.sizes ? (p.sizes[currentLang] || p.sizes['en']) : [];
 
   return `
@@ -993,7 +1095,7 @@ function viewCart() {
     const p = getProd(ci.id);
     const itemTotal = p.pr * ci.qty;
     subtotal += itemTotal;
-    const imgSrc = IMG[p.img] || IMG.cat0;
+    const imgSrc = getProdImg(p);
     const name = getProdName(p);
     return `
     <div class="cr">
@@ -1516,8 +1618,32 @@ function viewWishlist() {
   `;
 }
 
+let activeOrderListenerPhone = null;
+function listenToUserOrders(phone) {
+  if (!phone || activeOrderListenerPhone === phone) return;
+  activeOrderListenerPhone = phone;
+  const firestoreDb = window.db || (typeof firebase !== 'undefined' && firebase.apps.length ? firebase.app().firestore(firebaseConfig.firestoreDatabaseId) : null);
+  if (!firestoreDb) return;
+  
+  firestoreDb.collection('orders').where('phone', '==', phone).onSnapshot(snap => {
+    if (snap && !snap.empty) {
+      const orders = [];
+      snap.forEach(d => orders.push(d.data()));
+      orders.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+      localStorage.setItem('fp_orders', JSON.stringify(orders));
+      const hash = location.hash || '#/';
+      if (hash === '#/account') {
+        renderApp();
+      }
+    }
+  }, err => console.warn('User live orders listener notice:', err));
+}
+
 function viewAccount() {
   const savedUser = JSON.parse(localStorage.getItem('fp_user') || 'null');
+  if (savedUser && savedUser.phone) {
+    listenToUserOrders(savedUser.phone);
+  }
   const userOrders = JSON.parse(localStorage.getItem('fp_orders') || '[]');
   const districts = currentLang === 'en' ? BD_DISTRICTS_EN : BD_DISTRICTS_BN;
 
@@ -1617,11 +1743,23 @@ function saveUserProfile(e) {
     const userPayload = { name, phone: cleanPhone, dist, thana, addr, registered_at: new Date().toISOString() };
     localStorage.setItem('fp_user', JSON.stringify(userPayload));
 
-    // Firebase Firestore User Account Sync
-    if (typeof db !== 'undefined' && db && db.collection) {
-      db.collection('users').doc(cleanPhone).set(userPayload, { merge: true })
-        .then(() => console.log('User profile registered in Firebase Firestore'))
+    // Firebase Firestore User Account Sync (named database)
+    const firestoreDb = window.db || (typeof firebase !== 'undefined' && firebase.apps.length ? firebase.app().firestore(firebaseConfig.firestoreDatabaseId) : null);
+    if (firestoreDb) {
+      firestoreDb.collection('users').doc(cleanPhone).set(userPayload, { merge: true })
+        .then(() => console.log('User profile registered in Firebase users collection'))
         .catch(err => console.error('Firebase User Sync error:', err));
+
+      firestoreDb.collection('customers').doc(cleanPhone).set({
+        name,
+        phone: cleanPhone,
+        address: addr,
+        district: dist,
+        thana,
+        updatedAt: new Date().toISOString()
+      }, { merge: true })
+        .then(() => console.log('Customer record upserted in Firebase customers collection'))
+        .catch(err => console.error('Firebase Customer Sync error:', err));
     }
 
     toast(currentLang==='en'?'Account profile registered & saved successfully!':'আপনার অ্যাকাউন্ট তথ্য সফলভাবে রেজিস্টার ও সেভ করা হয়েছে!');
