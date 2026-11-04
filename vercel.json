@@ -27,6 +27,10 @@
       "dest": "/admin.html"
     },
     {
+      "src": "/",
+      "dest": "/assets/aistudio/fashion-point_6a561526.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }

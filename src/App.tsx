@@ -1,45 +1,33 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useEffect, useRef } from 'react';
-import { db } from './lib/firebase';
+import React, { useEffect } from 'react';
 
 export default function App() {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
   useEffect(() => {
-    const handleLoad = () => {
-      try {
-        if (iframeRef.current?.contentWindow) {
-          (iframeRef.current.contentWindow as any).nativeDb = db;
-        }
-      } catch (e) {
-        console.warn("Could not attach nativeDb to iframe window:", e);
-      }
-    };
-    const iframe = iframeRef.current;
-    if (iframe) {
-      iframe.addEventListener('load', handleLoad);
-      handleLoad();
-    }
-    return () => {
-      if (iframe) {
-        iframe.removeEventListener('load', handleLoad);
-      }
-    };
+    // Perform instant direct breakout/redirect to store page so fixed-bottom bars bind directly to browser viewport
+    const storeUrl = '/assets/aistudio/fashion-point_6a561526.html' + (window.location.hash || '#/');
+    window.location.replace(storeUrl);
   }, []);
 
   return (
-    <div style={{ width: '100vw', height: '100vh', margin: 0, padding: 0, overflow: 'hidden' }}>
-      <iframe
-        ref={iframeRef}
-        src="/assets/aistudio/fashion-point_6a561526.html"
-        title="Fashion Point"
-        style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-      />
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      color: '#10265a',
+      background: '#f6f9fe'
+    }}>
+      <div style={{
+        width: '48px',
+        height: '48px',
+        border: '4px solid #e4e7f0',
+        borderTopColor: '#e5195f',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite'
+      }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <p style={{ marginTop: '16px', fontWeight: 600 }}>Loading Fashion Point Store...</p>
     </div>
   );
 }
-
