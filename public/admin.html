@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fashion Point - Admin Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', 'Hind Siliguri', sans-serif; background-color: #f3f4f6; }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  <!-- Navigation Bar -->
+  <nav class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-xl font-bold">FP</div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">Fashion Point Admin</h1>
+          <p class="text-xs text-blue-400">Live Firebase Synchronization</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <span id="connection-status" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <span class="w-2 h-2 mr-1.5 bg-yellow-400 rounded-full animate-ping"></span> Connecting...
+        </span>
+        <button onclick="refreshData()" class="bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md text-xs font-semibold transition">
+          <i class="fa-solid fa-rotate mr-1"></i> Refresh
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Orders</p>
+          <h3 id="stat-total" class="text-2xl font-bold text-gray-900 mt-1">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl">
+          <i class="fa-solid fa-shopping-bag"></i>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Paid / Verified</p>
+          <h3 id="stat-paid" class="text-2xl font-bold text-emerald-600 mt-1">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending Orders</p>
+          <h3 id="stat-pending" class="text-2xl font-bold text-amber-500 mt-1">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Revenue</p>
+          <h3 id="stat-revenue" class="text-2xl font-bold text-indigo-600 mt-1">৳0</h3>
+        </div>
+        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl">
+          <i class="fa-solid fa-bangladeshi-taka-sign"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs Header & Action -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div class="flex space-x-2 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+        <button id="tab-btn-orders" onclick="switchTab('orders')" class="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white transition">
+          <i class="fa-solid fa-list-check mr-1.5"></i> Orders (<span id="count-orders-badge">0</span>)
+        </button>
+        <button id="tab-btn-products" onclick="switchTab('products')" class="px-4 py-2 text-sm font-semibold rounded-lg text-gray-600 hover:text-gray-900 transition">
+          <i class="fa-solid fa-shirt mr-1.5"></i> Products Management
+        </button>
+      </div>
+
+      <!-- Search & Filter -->
+      <div class="w-full sm:w-auto flex items-center space-x-2">
+        <div class="relative flex-1 sm:w-64">
+          <input type="text" id="search-input" onkeyup="filterOrders()" placeholder="Search Order ID, Phone..." 
+                 class="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-sm"></i>
+        </div>
+        <select id="status-filter" onchange="filterOrders()" class="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="all">All Status</option>
+          <option value="paid">Paid</option>
+          <option value="pending">Pending</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- TAB 1: ORDERS TABLE -->
+    <div id="tab-orders" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <th class="py-3.5 px-4">Order Details</th>
+              <th class="py-3.5 px-4">Customer Info</th>
+              <th class="py-3.5 px-4">Amount</th>
+              <th class="py-3.5 px-4">Payment</th>
+              <th class="py-3.5 px-4">Status</th>
+              <th class="py-3.5 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="orders-tbody" class="divide-y divide-gray-200 text-sm">
+            <tr>
+              <td colspan="6" class="text-center py-10 text-gray-400">
+                <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600 block"></i>
+                Loading orders from Firebase...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: PRODUCTS MANAGEMENT -->
+    <div id="tab-products" class="hidden space-y-6">
+      <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+          <i class="fa-solid fa-plus-circle text-blue-600 mr-2"></i> Add New Product to Store
+        </h2>
+        <form id="add-product-form" onsubmit="handleProductSubmit(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Product Title</label>
+            <input type="text" id="prod-title" required placeholder="e.g. Premium Cotton Panjabi" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Price (৳)</label>
+            <input type="number" id="prod-price" required placeholder="1250" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Old Price (৳)</label>
+            <input type="number" id="prod-old-price" placeholder="1800" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Image URL</label>
+            <input type="url" id="prod-image" required placeholder="https://images.unsplash.com/photo-..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Category</label>
+            <select id="prod-category" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="Panjabi">Panjabi</option>
+              <option value="Shirt">Shirt</option>
+              <option value="Polo">Polo T-Shirt</option>
+              <option value="Saree">Saree / Dress</option>
+            </select>
+          </div>
+          <div class="md:col-span-3 flex justify-end">
+            <button type="submit" id="btn-save-prod" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-floppy-disk mr-1.5"></i> Save Product to Firestore
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Existing Products List -->
+      <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Live Catalog Products</h2>
+        <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="col-span-full text-center py-8 text-gray-400">Loading products...</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FIREBASE MODULAR SDK INCLUSION -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getFirestore, 
+      collection, 
+      onSnapshot, 
+      doc, 
+      updateDoc, 
+      setDoc, 
+      deleteDoc,
+      query,
+      orderBy 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // --- FIREBASE CONFIGURATION ---
+    const firebaseConfig = {
+      projectId: "vigilant-medium-cct7q",
+      appId: "1:399290492442:web:3e0c2bd5255a6b176c13a3",
+      apiKey: "AIzaSyAhOoVvZNq0ALiYSRR-OmTOjMDr1dZq3Mg",
+      authDomain: "vigilant-medium-cct7q.firebaseapp.com",
+      storageBucket: "vigilant-medium-cct7q.firebasestorage.app",
+      messagingSenderId: "399290492442"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    // Connect to specific Database ID
+    const db = getFirestore(app, "ai-studio-fashionpoint-c79c3666-e185-4cd3-b96a-3545b7c91b7d");
+
+    let allOrders = [];
+    let allProducts = [];
+
+    // Global variables for tab state
+    window.db = db;
+
+    // --- REALTIME LISTENERS ---
+    function initListeners() {
+      const connStatus = document.getElementById("connection-status");
+
+      // Listen for Orders
+      const ordersRef = collection(db, "orders");
+      onSnapshot(ordersRef, (snapshot) => {
+        connStatus.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800";
+        connStatus.innerHTML = `<span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full"></span> Live Connected`;
+
+        allOrders = [];
+        snapshot.forEach((docSnap) => {
+          allOrders.push({ id: docSnap.id, ...docSnap.data() });
+        });
+
+        // Sort orders by created_at descending if available
+        allOrders.sort((a, b) => new Date(b.created_at || b.date || 0) - new Date(a.created_at || a.date || 0));
+
+        updateStats();
+        renderOrders(allOrders);
+      }, (error) => {
+        console.error("Firestore Order error:", error);
+        connStatus.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800";
+        connStatus.innerHTML = `<span class="w-2 h-2 mr-1.5 bg-red-500 rounded-full"></span> Connection Error`;
+      });
+
+      // Listen for Products
+      const prodsRef = collection(db, "products");
+      onSnapshot(prodsRef, (snapshot) => {
+        allProducts = [];
+        snapshot.forEach((docSnap) => {
+          allProducts.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        renderProducts(allProducts);
+      });
+    }
+
+    // --- RENDER ORDERS ---
+    function renderOrders(orders) {
+      const tbody = document.getElementById("orders-tbody");
+      document.getElementById("count-orders-badge").innerText = orders.length;
+
+      if (!orders || orders.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="text-center py-12 text-gray-400">
+              <i class="fa-solid fa-inbox text-3xl mb-2 block"></i>
+              No orders found in database yet.
+            </td>
+          </tr>`;
+        return;
+      }
+
+      tbody.innerHTML = orders.map(ord => {
+        const dateStr = ord.created_at ? new Date(ord.created_at).toLocaleString() : (ord.date || 'N/A');
+        const isPaid = (ord.status || '').toLowerCase() === 'paid' || ord.paid === true;
+        const statusClass = isPaid ? 'bg-emerald-100 text-emerald-800' : 
+                            (ord.status === 'completed' ? 'bg-blue-100 text-blue-800' : 
+                            (ord.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'));
+
+        const trxDisplay = ord.trx_id ? `<span class="font-mono text-xs bg-gray-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">${ord.trx_id}</span>` : '<span class="text-gray-400 text-xs">No TrxID</span>';
+
+        return `
+          <tr class="hover:bg-gray-50 transition">
+            <td class="py-3.5 px-4">
+              <span class="font-bold text-blue-600 block">${ord.id || ord.order_id}</span>
+              <span class="text-xs text-gray-400">${dateStr}</span>
+            </td>
+            <td class="py-3.5 px-4">
+              <p class="font-semibold text-gray-900">${ord.customer_name || ord.name || 'Guest Customer'}</p>
+              <p class="text-xs text-gray-600"><i class="fa-solid fa-phone text-gray-400 mr-1"></i>${ord.customer_phone || ord.phone || 'N/A'}</p>
+              <p class="text-xs text-gray-500 truncate max-w-xs">${ord.customer_address || ord.address || ''}, ${ord.district || ''}</p>
+            </td>
+            <td class="py-3.5 px-4">
+              <span class="font-bold text-gray-900">৳${ord.amount || ord.total || 0}</span>
+              <span class="block text-xs text-gray-400">Delivery: ৳${ord.delivery_charge || 0}</span>
+            </td>
+            <td class="py-3.5 px-4">
+              <span class="text-xs font-semibold text-gray-700 block uppercase">${ord.payment_method || ord.provider || 'COD'}</span>
+              ${trxDisplay}
+            </td>
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${statusClass}">
+                ${ord.status || 'Pending'}
+              </span>
+            </td>
+            <td class="py-3.5 px-4 text-right space-x-1">
+              <button onclick="updateOrderStatus('${ord.id}', 'paid')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1.5 rounded transition" title="Mark as Paid">
+                <i class="fa-solid fa-check"></i> Paid
+              </button>
+              <button onclick="updateOrderStatus('${ord.id}', 'completed')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1.5 rounded transition" title="Mark as Completed">
+                <i class="fa-solid fa-truck-fast"></i> Ship
+              </button>
+              <button onclick="updateOrderStatus('${ord.id}', 'cancelled')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2 py-1.5 rounded transition" title="Cancel Order">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    // --- UPDATE ORDER STATUS IN FIRESTORE ---
+    window.updateOrderStatus = async function(orderId, newStatus) {
+      try {
+        const orderDocRef = doc(db, "orders", orderId);
+        await updateDoc(orderDocRef, {
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        });
+        console.log(`Order ${orderId} updated to ${newStatus}`);
+      } catch (err) {
+        alert("Error updating order: " + err.message);
+      }
+    };
+
+    // --- RENDER PRODUCTS ---
+    function renderProducts(products) {
+      const grid = document.getElementById("products-grid");
+      if (!products || products.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center py-6 text-gray-400">No products added yet. Add one above!</div>`;
+        return;
+      }
+
+      grid.innerHTML = products.map(p => `
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 relative flex flex-col justify-between">
+          <div>
+            <img src="${p.image}" alt="${p.title}" class="w-full h-32 object-cover rounded mb-2">
+            <h4 class="font-bold text-sm text-gray-900 truncate">${p.title}</h4>
+            <div class="flex items-center justify-between mt-1">
+              <span class="text-blue-600 font-bold text-sm">৳${p.price}</span>
+              ${p.old_price ? `<span class="text-xs text-gray-400 line-through">৳${p.old_price}</span>` : ''}
+            </div>
+            <span class="inline-block mt-1 text-xs text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">${p.category || 'General'}</span>
+          </div>
+          <button onclick="deleteProduct('${p.id}')" class="mt-3 w-full bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold py-1.5 rounded transition">
+            <i class="fa-solid fa-trash mr-1"></i> Delete
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // --- ADD PRODUCT TO FIRESTORE ---
+    window.handleProductSubmit = async function(e) {
+      e.preventDefault();
+      const saveBtn = document.getElementById("btn-save-prod");
+      saveBtn.disabled = true;
+      saveBtn.innerText = "Saving to Firebase...";
+
+      const prodId = 'prod-' + Date.now();
+      const newProd = {
+        title: document.getElementById("prod-title").value.trim(),
+        price: Number(document.getElementById("prod-price").value),
+        old_price: Number(document.getElementById("prod-old-price").value) || 0,
+        image: document.getElementById("prod-image").value.trim(),
+        category: document.getElementById("prod-category").value,
+        created_at: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(doc(db, "products", prodId), newProd);
+        document.getElementById("add-product-form").reset();
+        alert("Product saved successfully to Firebase!");
+      } catch (err) {
+        alert("Failed to save product: " + err.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `<i class="fa-solid fa-floppy-disk mr-1.5"></i> Save Product to Firestore`;
+      }
+    };
+
+    // --- DELETE PRODUCT ---
+    window.deleteProduct = async function(prodId) {
+      if (!confirm("Are you sure you want to delete this product?")) return;
+      try {
+        await deleteDoc(doc(db, "products", prodId));
+      } catch (err) {
+        alert("Error deleting product: " + err.message);
+      }
+    };
+
+    // --- UPDATE DASHBOARD STATS ---
+    function updateStats() {
+      let total = allOrders.length;
+      let paidCount = 0;
+      let pendingCount = 0;
+      let totalRevenue = 0;
+
+      allOrders.forEach(o => {
+        const st = (o.status || '').toLowerCase();
+        if (st === 'paid' || o.paid === true || st === 'completed') {
+          paidCount++;
+          totalRevenue += Number(o.amount || o.total || 0);
+        } else {
+          pendingCount++;
+        }
+      });
+
+      document.getElementById("stat-total").innerText = total;
+      document.getElementById("stat-paid").innerText = paidCount;
+      document.getElementById("stat-pending").innerText = pendingCount;
+      document.getElementById("stat-revenue").innerText = "৳" + totalRevenue.toLocaleString();
+    }
+
+    // --- FILTER & SEARCH ---
+    window.filterOrders = function() {
+      const query = document.getElementById("search-input").value.toLowerCase().trim();
+      const statusFilter = document.getElementById("status-filter").value;
+
+      const filtered = allOrders.filter(o => {
+        const matchesQuery = (o.id || '').toLowerCase().includes(query) ||
+                             (o.customer_phone || o.phone || '').includes(query) ||
+                             (o.customer_name || o.name || '').toLowerCase().includes(query) ||
+                             (o.trx_id || '').toLowerCase().includes(query);
+
+        const isPaid = (o.status || '').toLowerCase() === 'paid';
+        const matchesStatus = statusFilter === 'all' || 
+                              (statusFilter === 'paid' && isPaid) ||
+                              (statusFilter === (o.status || '').toLowerCase());
+
+        return matchesQuery && matchesStatus;
+      });
+
+      renderOrders(filtered);
+    };
+
+    // --- TAB SWITCHING ---
+    window.switchTab = function(tabName) {
+      const ordersTab = document.getElementById("tab-orders");
+      const prodsTab = document.getElementById("tab-products");
+      const btnOrders = document.getElementById("tab-btn-orders");
+      const btnProds = document.getElementById("tab-btn-products");
+
+      if (tabName === 'orders') {
+        ordersTab.classList.remove("hidden");
+        prodsTab.classList.add("hidden");
+        btnOrders.className = "px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white transition";
+        btnProds.className = "px-4 py-2 text-sm font-semibold rounded-lg text-gray-600 hover:text-gray-900 transition";
+      } else {
+        ordersTab.classList.add("hidden");
+        prodsTab.classList.remove("hidden");
+        btnProds.className = "px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white transition";
+        btnOrders.className = "px-4 py-2 text-sm font-semibold rounded-lg text-gray-600 hover:text-gray-900 transition";
+      }
+    };
+
+    window.refreshData = function() {
+      initListeners();
+    };
+
+    // Start Realtime Sync
+    initListeners();
+  </script>
+</body>
+</html>

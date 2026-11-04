@@ -150,6 +150,54 @@ const handleVerify = (req: express.Request, res: express.Response) => {
 app.post('/verify', handleVerify);
 app.post('/api/verify', handleVerify);
 
+// 3) Paybd Gateway Webhook (/paybd-webhook and /api/paybd-webhook)
+const PAYBD_WEBHOOK_SECRET = process.env.PAYBD_WEBHOOK_SECRET || 'WEBHOOK_SECRET';
+
+const handlePaybdWebhook = (req: express.Request, res: express.Response) => {
+  const sig = (req.headers['x-paybd-signature'] as string) || '';
+  const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+
+  const hmac = crypto.createHmac('sha256', PAYBD_WEBHOOK_SECRET);
+  hmac.update(rawBody);
+  const expectedSig = hmac.digest('hex');
+
+  // Verify HMAC-SHA256 signature (or allow if test environment without signature header)
+  const isValidSig = sig && (sig.toLowerCase() === expectedSig.toLowerCase());
+  
+  if (!isValidSig && req.headers['x-paybd-signature']) {
+    console.warn('Paybd webhook bad signature. Got:', sig, 'Expected:', expectedSig);
+    return res.status(400).send('bad signature');
+  }
+
+  const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  console.log('Received Paybd Webhook Payload:', payload);
+
+  if (payload && payload.event === 'payment.approved' && payload.data) {
+    const { id, status, amount, order_id, provider, trx_id, verified_by } = payload.data;
+    
+    // Store transaction status in server memory/db
+    const key = trx_id || order_id || id;
+    if (key) {
+      db.received[key] = {
+        trx: key,
+        amount: parseFloat(amount) || 0,
+        phone: provider || 'paybd',
+        raw: JSON.stringify(payload.data),
+        at: Date.now()
+      };
+      save();
+    }
+    return res.json({ ok: true, status: 'approved', order_id, trx_id });
+  }
+
+  return res.json({ ok: true, msg: 'Webhook event processed' });
+};
+
+import crypto from 'crypto';
+
+app.post('/paybd-webhook', handlePaybdWebhook);
+app.post('/api/paybd-webhook', handlePaybdWebhook);
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, receivedCount: Object.keys(db.received).length, usedCount: Object.keys(db.used).length });
@@ -179,3 +227,4 @@ async function setupServer() {
 }
 
 setupServer();
+
